@@ -15,6 +15,7 @@
     "node-fetch": "^3.3.2"
   },
   "devDependencies": {
+    "@figma/rest-api-spec": "^0.34.0",
     "@types/node": "^22.0.0",
     "@types/node-fetch": "^3.0.3",
     "ts-node": "^10.9.2",

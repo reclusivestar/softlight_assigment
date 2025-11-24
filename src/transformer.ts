@@ -1,226 +1,339 @@
-// src/transformer.ts
-import type { UiNode, UiLayout, UiStyle } from "./types";
+import type {
+  UiNode,
+  UiLayout,
+  UiStyle,
+  FigmaBounds,
+  FigmaNode,
+  FigmaLayoutMode,
+  FigmaPaint,
+} from "./types";
 
-export function figmaToUiTree(
-  node: any,
-  parentBox?: any,
-  parentLayoutMode?: "VERTICAL" | "HORIZONTAL" | "NONE"
-): UiNode {
-  // ✅ You were missing this:
-  const commonBase = {
-    id: node.id as string,
-    name: node.name as string,
-  };
-
-  const layout = extractLayout(node, parentBox, parentLayoutMode);
-  const style = extractStyle(node);
-
-  const children = (node.children || []).map((child: any) =>
-    figmaToUiTree(
-      child,
-      node.absoluteBoundingBox || parentBox,
-      node.layoutMode || parentLayoutMode
-    )
-  );
-
-  switch (node.type) {
+/**
+ * Map a raw Figma node type to our UiNode type.
+ */
+function mapNodeType(figmaType: string): UiNode["type"] {
+  switch (figmaType) {
     case "TEXT":
-      return {
-        ...commonBase,
-        type: "text",
-        children: [],
-        layout,
-        style,
-        textContent: node.characters ?? "",
-      };
+      return "text";
     case "RECTANGLE":
-      return {
-        ...commonBase,
-        type: "rect",
-        children,
-        layout,
-        style,
-      };
+      return "rect";
+    case "GROUP":
+      return "group";
     case "FRAME":
     case "COMPONENT":
     case "INSTANCE":
-      return {
-        ...commonBase,
-        type: "frame",
-        children,
-        layout,
-        style,
-      };
-    case "GROUP":
-      return {
-        ...commonBase,
-        type: "group",
-        children,
-        layout,
-        style,
-      };
     default:
-      return {
-        ...commonBase,
-        type: "frame",
-        children,
-        layout,
-        style,
-      };
+      return "frame";
   }
 }
 
-function extractLayout(
-  node: any,
-  parentBox?: any,
-  parentLayoutMode?: "VERTICAL" | "HORIZONTAL" | "NONE"
-): UiLayout {
-  const box = node.absoluteBoundingBox;
-  const layoutMode = node.layoutMode as
-    | "VERTICAL"
-    | "HORIZONTAL"
-    | "NONE"
-    | undefined;
+/**
+ * Entrypoint: convert a Figma node tree → UiNode tree.
+ */
+export function figmaToUiTree(
+  figmaNode: FigmaNode,
+  parentBounds?: FigmaBounds,
+  parentLayoutMode?: FigmaLayoutMode
+): UiNode {
+  const nodeType = mapNodeType(figmaNode.type);
 
-  const layout: UiLayout = { position: "relative" };
+  const layout = extractLayout(figmaNode, parentBounds, parentLayoutMode);
+  const style = extractStyle(figmaNode);
 
-  if (box) {
-    layout.width = box.width;
-    layout.height = box.height;
-  }
+  const base: Omit<UiNode, "children" | "textContent" | "type"> = {
+    id: figmaNode.id,
+    name: figmaNode.name,
+    layout,
+    style,
+  };
 
-  const isParentAutoLayout = parentLayoutMode && parentLayoutMode !== "NONE";
-  const isAbsoluteChild = node.layoutPositioning === "ABSOLUTE";
-
-  // 🔹 Decide if this node should use absolute coordinates
-  // - If parent is NOT auto-layout → always use absolute (like your screen children)
-  // - If parent IS auto-layout → only use absolute when Figma says so
-  if (box && parentBox && (!isParentAutoLayout || isAbsoluteChild)) {
-    layout.position = "absolute";
-    layout.x = box.x - (parentBox.x ?? 0);
-    layout.y = box.y - (parentBox.y ?? 0);
-  }
-
-  // 🔹 If THIS node is an auto-layout frame, also make it flex
-  if (layoutMode && layoutMode !== "NONE") {
-    layout.display = "flex";
-    layout.flexDirection = layoutMode === "VERTICAL" ? "column" : "row";
-    layout.gap = node.itemSpacing ?? 0;
-    layout.padding = {
-      top: node.paddingTop ?? 0,
-      right: node.paddingRight ?? 0,
-      bottom: node.paddingBottom ?? 0,
-      left: node.paddingLeft ?? 0,
+  // Text nodes are leaves
+  if (nodeType === "text") {
+    return {
+      ...base,
+      type: "text",
+      children: [],
+      textContent: figmaNode.characters ?? "",
     };
+  }
+
+  const nextParentBounds = figmaNode.absoluteBoundingBox ?? parentBounds;
+  const nextParentLayoutMode =
+    (figmaNode.layoutMode as FigmaLayoutMode) ?? parentLayoutMode;
+
+  const children: UiNode[] = (figmaNode.children ?? [])
+    .slice()
+    .sort((a, b) => {
+      const ay = a.absoluteBoundingBox?.y ?? 0;
+      const by = b.absoluteBoundingBox?.y ?? 0;
+      return ay - by;
+    })
+    .map((child) =>
+      figmaToUiTree(child, nextParentBounds, nextParentLayoutMode)
+    );
+
+  return {
+    ...base,
+    type: nodeType,
+    children,
+  };
+}
+
+/**
+ * Extracts layout information (position, size, flex) into UiLayout.
+ */
+export function extractLayout(
+  figmaNode: FigmaNode,
+  parentBounds?: FigmaBounds,
+  parentLayoutMode?: FigmaLayoutMode
+): UiLayout {
+  const bounds = figmaNode.absoluteBoundingBox;
+  const autoLayoutMode = figmaNode.layoutMode as FigmaLayoutMode;
+
+  const layout: UiLayout = {
+    position: "relative",
+  };
+
+  // Base size
+  if (bounds) {
+    layout.width = bounds.width;
+    layout.height = bounds.height;
+  }
+
+  const parentIsAuto = isAutoLayout(parentLayoutMode);
+  const isAutoContainer = isAutoLayout(autoLayoutMode);
+  const isAbsolutelyPositioned = figmaNode.layoutPositioning === "ABSOLUTE";
+
+  // Absolute positioning relative to parent bounds
+  if (bounds && parentBounds && (!parentIsAuto || isAbsolutelyPositioned)) {
+    layout.position = "absolute";
+    layout.x = bounds.x - parentBounds.x;
+    layout.y = bounds.y - parentBounds.y;
+  }
+
+  // Auto-layout containers → flex
+  if (isAutoContainer) {
+    applyAutoLayoutConfig(layout, figmaNode);
   }
 
   return layout;
 }
 
-function extractStyle(node: any): UiStyle {
+/**
+ * Whether a Figma layout mode represents auto-layout.
+ */
+function isAutoLayout(mode: FigmaLayoutMode): boolean {
+  return !!mode && mode !== "NONE";
+}
+
+/**
+ * Apply flexbox-related properties for Figma auto-layout containers.
+ */
+function applyAutoLayoutConfig(layout: UiLayout, figmaNode: FigmaNode) {
+  const mode = figmaNode.layoutMode as FigmaLayoutMode;
+
+  layout.display = "flex";
+  layout.flexDirection = mode === "VERTICAL" ? "column" : "row";
+  layout.gap = figmaNode.itemSpacing ?? 0;
+
+  layout.padding = {
+    top: figmaNode.paddingTop ?? 0,
+    right: figmaNode.paddingRight ?? 0,
+    bottom: figmaNode.paddingBottom ?? 0,
+    left: figmaNode.paddingLeft ?? 0,
+  };
+
+  const primary = figmaNode.primaryAxisAlignItems;
+  const counter = figmaNode.counterAxisAlignItems;
+
+  if (primary) layout.justifyContent = mapPrimaryAlign(primary);
+  if (counter) layout.alignItems = mapCounterAlign(counter);
+}
+
+function mapPrimaryAlign(
+  value: "MIN" | "MAX" | "CENTER" | "SPACE_BETWEEN"
+): string {
+  switch (value) {
+    case "MIN":
+      return "flex-start";
+    case "MAX":
+      return "flex-end";
+    case "CENTER":
+      return "center";
+    case "SPACE_BETWEEN":
+      return "space-between";
+    default:
+      return "flex-start";
+  }
+}
+
+function mapCounterAlign(value: "MIN" | "MAX" | "CENTER"): string {
+  switch (value) {
+    case "MIN":
+      return "flex-start";
+    case "MAX":
+      return "flex-end";
+    case "CENTER":
+      return "center";
+    default:
+      return "stretch";
+  }
+}
+
+/**
+ * Extracts visual style (fills, strokes, text styles, shadows) into UiStyle.
+ */
+function extractStyle(figmaNode: FigmaNode): UiStyle {
   const style: UiStyle = {};
 
-  // fills → background OR text color
-  const visibleFill = (node.fills || []).find((f: any) => f.visible !== false);
-  const fillCss = visibleFill ? paintToCss(visibleFill) : undefined;
+  // Fills
+  const fillPaint = firstVisiblePaint(figmaNode.fills);
+  const fillCss = fillPaint ? paintToCss(fillPaint) : undefined;
 
-  // strokes
-  const visibleStroke = (node.strokes || []).find(
-    (s: any) => s.visible !== false
-  );
-  if (visibleStroke && node.strokeWeight) {
-    const c = visibleStroke.color;
-    const opacity = visibleStroke.opacity ?? c.a ?? 1;
-    style.borderColor = rgbaFromColor(c, opacity);
-    style.borderWidth = node.strokeWeight;
+  // Stroke → border
+  const strokePaint = firstVisiblePaint(figmaNode.strokes);
+  if (strokePaint && figmaNode.strokeWeight) {
+    const color = strokePaint.color!;
+    const opacity = strokePaint.opacity ?? color.a ?? 1;
+    style.borderColor = rgbaFromColor(color, opacity);
+    style.borderWidth = figmaNode.strokeWeight;
   }
 
-  // corner radius
-  if (typeof node.cornerRadius === "number") {
-    style.borderRadius = `${node.cornerRadius}px`;
-  } else if (Array.isArray(node.rectangleCornerRadii)) {
-    const [tl, tr, br, bl] = node.rectangleCornerRadii;
-    style.borderRadius = `${tl}px ${tr}px ${br}px ${bl}px`;
-  }
+  // Corner radius
+  applyCornerRadius(style, figmaNode);
 
-  // shadows
-  const shadow = (node.effects || []).find(
-    (e: any) => e.type === "DROP_SHADOW"
-  );
-  if (shadow) {
-    const c = shadow.color;
-    const color = rgbaFromColor(c, c.a ?? 1);
-    style.boxShadow = `${shadow.offset.x}px ${shadow.offset.y}px ${shadow.radius}px ${color}`;
-  }
+  // Drop shadow
+  applyDropShadow(style, figmaNode);
 
-  // text-specific styles
-  if (node.type === "TEXT") {
-    const s = node.style || {};
-    if (s.fontSize) style.fontSize = s.fontSize;
-    if (s.fontWeight) style.fontWeight = s.fontWeight;
-    if (s.fontFamily)
-      style.fontFamily = `"${s.fontFamily}", system-ui, -apple-system, sans-serif`;
-    if (s.lineHeightPx) style.lineHeight = s.lineHeightPx;
-    if (typeof s.letterSpacing === "number")
-      style.letterSpacing = s.letterSpacing;
-    if (s.textAlignHorizontal) {
-      style.textAlign = (s.textAlignHorizontal as string).toLowerCase() as
-        | "left"
-        | "right"
-        | "center"
-        | "justify";
-    }
-
-    // For text, treat fill as color instead of background
-    if (visibleFill) {
-      const c = visibleFill.color;
-      const opacity = visibleFill.opacity ?? c.a ?? 1;
-      style.color = rgbaFromColor(c, opacity);
-    }
+  // Text vs non-text
+  if (figmaNode.type === "TEXT") {
+    applyTextStyle(style, figmaNode, fillPaint);
   } else if (fillCss) {
-    // For non-text, treat fill as background
     style.background = fillCss;
   }
 
   return style;
 }
 
-// ---- helpers ----
+/**
+ * First visible paint in an array (fills or strokes).
+ */
+function firstVisiblePaint(paints?: FigmaPaint[]): FigmaPaint | undefined {
+  return (paints ?? []).find((paint) => paint.visible !== false);
+}
 
-function paintToCss(paint: any): string | undefined {
-  if (!paint) return;
-
-  if (paint.type === "SOLID") {
-    const c = paint.color;
-    const opacity = paint.opacity ?? c.a ?? 1;
-    return rgbaFromColor(c, opacity);
+/**
+ * Apply corner radius styles from Figma node.
+ */
+function applyCornerRadius(style: UiStyle, figmaNode: FigmaNode) {
+  if (typeof figmaNode.cornerRadius === "number") {
+    style.borderRadius = `${figmaNode.cornerRadius}px`;
+    return;
   }
 
-  if (paint.type === "GRADIENT_LINEAR") {
-    const stops = paint.gradientStops;
-    if (!stops || stops.length < 2) return;
-    const toStop = (s: any) => {
-      const c = s.color;
-      const opacity = c.a ?? 1;
-      const color = rgbaFromColor(c, opacity);
-      const pos = Math.round(s.position * 100);
-      return `${color} ${pos}%`;
-    };
-    const colors = stops.map(toStop).join(", ");
-    // You can refine angle based on gradientTransform if you want
-    return `linear-gradient(90deg, ${colors})`;
+  if (Array.isArray(figmaNode.rectangleCornerRadii)) {
+    const [topLeft, topRight, bottomRight, bottomLeft] =
+      figmaNode.rectangleCornerRadii;
+    style.borderRadius = `${topLeft}px ${topRight}px ${bottomRight}px ${bottomLeft}px`;
+  }
+}
+
+/**
+ * Apply drop-shadow from Figma node effects.
+ */
+function applyDropShadow(style: UiStyle, figmaNode: FigmaNode) {
+  const shadow = (figmaNode.effects || []).find(
+    (effect: any) => effect.type === "DROP_SHADOW"
+  );
+  if (!shadow) return;
+
+  const color = shadow.color;
+  const rgba = rgbaFromColor(color, color.a ?? 1);
+  style.boxShadow = `${shadow.offset.x}px ${shadow.offset.y}px ${shadow.radius}px ${rgba}`;
+}
+
+/**
+ * Apply text-specific style (font, alignment, color) for TEXT nodes.
+ */
+function applyTextStyle(
+  style: UiStyle,
+  figmaNode: FigmaNode,
+  fillPaint?: FigmaPaint
+) {
+  const textStyle = figmaNode.style ?? {};
+
+  if (textStyle.fontSize) style.fontSize = textStyle.fontSize;
+  if (textStyle.fontWeight) style.fontWeight = textStyle.fontWeight;
+  if (textStyle.fontFamily) {
+    style.fontFamily = `"${textStyle.fontFamily}", system-ui, -apple-system, sans-serif`;
+  }
+  if (textStyle.lineHeightPx) {
+    style.lineHeight = textStyle.lineHeightPx;
+  }
+  if (typeof textStyle.letterSpacing === "number") {
+    style.letterSpacing = textStyle.letterSpacing;
   }
 
-  // Image, radial etc: TODO
+  if (textStyle.textAlignHorizontal) {
+    style.textAlign = textStyle.textAlignHorizontal.toLowerCase() as
+      | "left"
+      | "right"
+      | "center"
+      | "justify";
+  }
+
+  if (textStyle.textAlignVertical) {
+    style.textAlignVertical = textStyle.textAlignVertical;
+  }
+
+  // For text, fill becomes text color
+  if (fillPaint && fillPaint.color) {
+    const color = fillPaint.color;
+    const opacity = fillPaint.opacity ?? color.a ?? 1;
+    style.color = rgbaFromColor(color, opacity);
+  }
+}
+
+/**
+ * Convert a Figma paint to a CSS color/gradient string.
+ */
+function paintToCss(paint: FigmaPaint): string | undefined {
+  if (paint.type === "SOLID" && paint.color) {
+    const color = paint.color;
+    const opacity = paint.opacity ?? color.a ?? 1;
+    return rgbaFromColor(color, opacity);
+  }
+
+  if (paint.type === "GRADIENT_LINEAR" && paint.gradientStops) {
+    if (paint.gradientStops.length < 2) return;
+
+    const stops = paint.gradientStops
+      .map((stop) => {
+        const color = stop.color;
+        const opacity = color.a ?? 1;
+        const rgba = rgbaFromColor(color, opacity);
+        const position = Math.round(stop.position * 100);
+        return `${rgba} ${position}%`;
+      })
+      .join(", ");
+
+    // Angle could be improved via gradientTransform, but 90deg is fine for now
+    return `linear-gradient(90deg, ${stops})`;
+  }
+
+  // TODO: IMAGE, RADIAL, etc.
   return;
 }
 
+/**
+ * Convert Figma color + opacity → CSS rgba string.
+ */
 function rgbaFromColor(
-  c: { r: number; g: number; b: number; a?: number },
+  color: { r: number; g: number; b: number; a?: number },
   opacity: number
 ): string {
-  const r = Math.round(c.r * 255);
-  const g = Math.round(c.g * 255);
-  const b = Math.round(c.b * 255);
+  const r = Math.round(color.r * 255);
+  const g = Math.round(color.g * 255);
+  const b = Math.round(color.b * 255);
   return `rgba(${r}, ${g}, ${b}, ${opacity})`;
 }

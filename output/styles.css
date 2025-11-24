@@ -1,22 +1,31 @@
 html, body {
-  margin: 0;
-  padding: 0;
-  height: 100%;
-}
+      margin: 0;
+      padding: 0;
+      height: 100%;
+    }
 
-body {
-  margin: 0;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: #ffffff;
-}
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
 
-.root {
-  position: relative;
-  overflow: hidden;
-  min-height: 100vh;
-}
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #ffffff;
+    }
 
-.node-1_75 {
+    /* Reset default paragraph margin so text boxes match Figma more closely */
+    p {
+      margin: 0;
+    }
+
+    /* Root acts as a viewport-sized scroll container */
+    .root {
+      max-height: 100vh;
+      overflow: auto;
+    }
+
+.node-3015_2 {
   position: absolute;
   left: 0px;
   top: 0px;
@@ -24,33 +33,18 @@ body {
   height: 852px;
   background: rgba(250, 250, 250, 1);
   border-radius: 32px;
-  outline: 1px solid red;
+  outline: 1px solid;
 }
 
-.node-1_110 {
-  position: absolute;
-  left: 0px;
-  top: 831px;
-  width: 393px;
-  height: 21px;
-}
-
-.node-1_111 {
-  position: absolute;
-  left: 127.00000000000011px;
-  top: 8px;
-  width: 139px;
-  height: 5px;
-  background: rgba(44, 25, 77, 1);
-  border-radius: 100px;
-}
-
-.node-1_112 {
+.node-3015_5 {
   position: absolute;
   left: 32.000000000000114px;
   top: 170px;
   width: 154px;
   height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
   color: rgba(54, 51, 65, 1);
   font-family: "Inter", system-ui, -apple-system, sans-serif;
   font-size: 48.00px;
@@ -60,29 +54,32 @@ body {
   text-align: left;
 }
 
-.node-1_114 {
+.node-3015_6 {
   position: absolute;
   left: 32.000000000000114px;
   top: 252px;
   display: flex;
   flex-direction: column;
   gap: 0px;
+  padding: 0px 0px 0px 0px;
   width: 329px;
   height: 117px;
 }
 
-.node-1_115 {
+.node-3015_7 {
   position: relative;
   display: flex;
   flex-direction: row;
   gap: 10px;
+  align-items: center;
+  padding: 20px 16px 20px 16px;
   width: 329px;
   height: 58px;
   border: 1px solid rgba(215, 215, 215, 1);
   border-radius: 8px 8px 0px 0px;
 }
 
-.node-1_116 {
+.node-3015_8 {
   position: relative;
   width: 120px;
   height: 18px;
@@ -95,18 +92,20 @@ body {
   text-align: left;
 }
 
-.node-1_117 {
+.node-3015_9 {
   position: relative;
   display: flex;
   flex-direction: row;
   gap: 10px;
+  align-items: center;
+  padding: 20px 16px 20px 16px;
   width: 329px;
   height: 59px;
   border: 1px solid rgba(215, 215, 215, 1);
   border-radius: 0px 0px 8px 8px;
 }
 
-.node-1_118 {
+.node-3015_10 {
   position: relative;
   width: 69px;
   height: 18px;
@@ -119,20 +118,23 @@ body {
   text-align: left;
 }
 
-.node-1_120 {
+.node-3015_11 {
   position: absolute;
   left: 16.000000000000114px;
   top: 662px;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  justify-content: center;
+  align-items: center;
+  padding: 0px 0px 0px 0px;
   width: 361px;
   height: 46px;
   background: linear-gradient(90deg, rgba(149, 34, 140, 1) 0%, rgba(58, 60, 179, 1) 100%);
   border-radius: 62px;
 }
 
-.node-1_123 {
+.node-3015_12 {
   position: relative;
   width: 49px;
   height: 22px;
@@ -145,20 +147,23 @@ body {
   text-align: center;
 }
 
-.node-1_125 {
+.node-3015_13 {
   position: absolute;
   left: 16.000000000000114px;
   top: 720px;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  justify-content: center;
+  align-items: center;
+  padding: 0px 0px 0px 0px;
   width: 361px;
   height: 46px;
   background: rgba(225, 224, 230, 1);
   border-radius: 62px;
 }
 
-.node-1_126 {
+.node-3015_14 {
   position: relative;
   width: 110px;
   height: 22px;
@@ -171,12 +176,15 @@ body {
   text-align: center;
 }
 
-.node-1_127 {
+.node-3015_15 {
   position: absolute;
   left: 16.000000000000114px;
   top: 778px;
   width: 361px;
   height: 37px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: rgba(54, 51, 65, 0.800000011920929);
   font-family: "Inter", system-ui, -apple-system, sans-serif;
   font-size: 13.00px;
@@ -184,4 +192,22 @@ body {
   line-height: 15.600000381469727px;
   letter-spacing: -0.26px;
   text-align: center;
+}
+
+.node-3015_3 {
+  position: absolute;
+  left: 0px;
+  top: 831px;
+  width: 393px;
+  height: 21px;
+}
+
+.node-3015_4 {
+  position: absolute;
+  left: 127.00000000000011px;
+  top: 8px;
+  width: 139px;
+  height: 5px;
+  background: rgba(44, 25, 77, 1);
+  border-radius: 100px;
 }

@@ -1,22 +1,22 @@
-// src/htmlGenerator.ts
 import type { UiNode } from "./types";
+import { sanitizeId } from "./utils";
 
 export function generateHtml(root: UiNode): string {
   const bodyMarkup = renderNode(root, 0);
 
   return `<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <title>${escapeHtml(root.name)}</title>
-    <link rel="stylesheet" href="styles.css" />
-  </head>
-  <body>
-    <div class="root">
-${bodyMarkup}
-    </div>
-  </body>
-</html>`;
+          <html>
+            <head>
+              <meta charset="utf-8" />
+              <title>${escapeHtml(root.name)}</title>
+              <link rel="stylesheet" href="styles.css" />
+            </head>
+            <body>
+              <div class="root">
+          ${bodyMarkup}
+              </div>
+            </body>
+          </html>`;
 }
 
 function renderNode(node: UiNode, depth: number): string {
@@ -39,12 +39,8 @@ function renderNode(node: UiNode, depth: number): string {
   }
 
   return `${indent}<${tag} class="${className}" data-name="${dataName}">
-${childrenHtml}
-${indent}</${tag}>`;
-}
-
-function sanitizeId(id: string): string {
-  return id.replace(/[^a-zA-Z0-9_-]/g, "_");
+        ${childrenHtml}
+        ${indent}</${tag}>`;
 }
 
 function escapeHtml(text: string): string {
