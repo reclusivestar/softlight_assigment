@@ -9,6 +9,75 @@ The system fetches a Figma file via the REST API, transforms its node tree into 
 
 ---
 
+# **Installation & Usage**
+
+## **Prerequisites**
+
+- **Node.js 18+**
+- A **Figma Personal Access Token** with `file_read` permissions
+  (Create one at [https://www.figma.com/developers/api#auth-access-tokens](https://www.figma.com/developers/api#auth-access-tokens))
+
+Your token must be available as an environment variable:
+
+```
+FIGMA_TOKEN=your_token_here
+```
+
+You can store this in a `.env` file at the project root:
+
+```
+# .env
+FIGMA_TOKEN=YOUR_FIGMA_TOKEN
+```
+
+---
+
+## **1. Install dependencies**
+
+```bash
+npm install
+```
+
+---
+
+## **2. Run the converter**
+
+The CLI accepts:
+
+```
+npm start <FIGMA_FILE_KEY> [FRAME_NAME]
+```
+
+### **Example: Convert a Figma file**
+
+```bash
+npm start AbCdEfGhIjKlMnOpQrStUvWx
+```
+
+### **Example: Convert a specific frame by name**
+
+```bash
+npm start AbCdEfGhIjKlMnOpQrStUvWx "Login Screen"
+```
+
+If the frame name is omitted, the converter automatically finds the **first FRAME** in the file.
+
+---
+
+## **3. View the output**
+
+After running the command, the tool generates:
+
+```
+output/
+  index.html
+  styles.css
+```
+
+Open `output/index.html` in your browser to see the result.
+
+---
+
 # **Approach Overview**
 
 ## **1. Fetching the Figma File**
